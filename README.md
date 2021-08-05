@@ -1,3 +1,11 @@
+# FAB
+
+<p align="center">
+  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/Python-3.8.x-blue" alt="Python"></a>
+  <a href="https://palletsprojects.com/p/flask/"><img src="https://img.shields.io/badge/Flask-v2.0.x-black" alt="Flask"></a>
+  <a href="http://docs.jinkan.org/docs/jinja2/"><img src="https://img.shields.io/badge/Jinja-v2.2.x-green" alt="Jinja"></a>
+</p>
+
 
 # 本地开发
 
