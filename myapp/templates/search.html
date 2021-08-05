@@ -1,0 +1,87 @@
+{% extends "appbuilder/base.html" %}
+
+{% block add_tail_js %}
+<!-- <script src="{{url_for('appbuilder.static',filename='js/test.min.js')}}"></script> -->
+{% endblock %}
+
+{% block content %}
+<!-- 搜索栏 -->
+<div class="di-block di-block_search">
+    <div class="di-search {% if data['logo'] %}di-search_logo{% endif %} {% if data['icon'] %}di-search_icon{% endif %}">
+        <input type="search" id="search" name="keyword" placeholder="{{ data['placeholder'] }}"
+            maxlength="{{ data['maxlength'] }}" oninput="onSearch(this)" />
+        {% if data['icon'] %}
+        <button type="button">搜索</button>
+        {% endif %}
+    </div>
+</div>
+<!-- 搜索结果 -->
+<div class="di-block di-block_searchResult off">
+    <div style="width: 65vw">
+        <h3 class="di-search-result">搜索结果</h3>
+        <ul id="di-list" class="di-list">
+            <!-- 搜索结果填充区域 -->
+        </ul>
+    </div>
+</div>
+
+<script>
+    function debounce(fn, wait) {    
+        let timeout = null;    
+        return function() {        
+            if(timeout !== null) clearTimeout(timeout);        
+            timeout = setTimeout(fn, wait);    
+        }
+    }
+
+    let searchFn = null;
+    function onSearch(e) {
+        if(!searchFn) searchFn = debounce(function() {
+            const keyword = e.value.trim();
+            const container = document.querySelector( '#di-list' );
+            const color = '{{ data['lightColor'] }}';
+
+            if( keyword ) {
+                const view = document.querySelector( '.di-block.off' );
+                if( view ) view.classList.remove('off');
+            }else {
+                return;
+            }
+
+            // 跨域JSONP请求
+            $.getJSON( '{{ data['api'] }}&cb=?', {
+                '{{ data['apikey'] }}' : keyword,
+            }, function( data ) {
+                // TODO
+                console.log(data);
+                // 对应解析的字段
+                const list = [];
+                for( const suggest of data.AS.Results[0].Suggests) {
+                    const txt = suggest.Txt;
+                    console.log(txt);
+                    list.push(`<li>
+                        <a href="https://cn.bing.com/search?q=${txt}" target="_blank">
+                            <p><b style="color: ${color}">${keyword}</b>${txt.substr( txt.indexOf( keyword ) + keyword.length )}</p>
+                            <p class="info">aaaa | bbb | ccc | ddd</p>
+                        </a>
+                    </li>`);
+                }
+                container.innerHTML = list.join('');
+            });
+            
+            // 同域请求GET
+            // $.get( `{{ data['api'] }}?{{ data['apikey'] }}=${keyword}`, function( data ) {
+            //     // TODO
+            // });
+
+            // 同域请求POST
+            // $.post( '{{ data['api'] }}', {
+            //    '{{ data['apikey'] }}': keyword
+            // }, function( data ) {
+            //     // TODO
+            // });
+        }, {{ data['delay'] | default('500') }});
+        searchFn();
+    }
+</script>
+{% endblock %}

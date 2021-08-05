@@ -1,0 +1,77 @@
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: myapp-worker
+  namespace: infra
+  labels:
+    app: myapp-worker
+
+spec:
+  replicas: 1   # 只能是一个
+  selector:
+    matchLabels:
+      app: myapp-worker
+  template:
+    metadata:
+      name: myapp-worker
+      labels:
+        app: myapp-worker
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: myapp
+                operator: In
+                values:
+                - "true"
+      volumes:
+        - name: tz-config
+          hostPath:
+            path: /usr/share/zoneinfo/Asia/Shanghai
+        - name: myapp-configs
+          configMap:
+            name: myapp-configmap
+            items:
+              - key: config.py
+                path: config.py
+              - key: entrypoint.sh
+                path: entrypoint.sh
+      containers:
+        - name: myapp-worker
+          image: tencentmusic/myapp:2020.10.01
+          imagePullPolicy: IfNotPresent
+          command: ["bash","-c",'celery worker --app=myapp.tasks.celery_app:celery_app --loglevel=info --pool=prefork -Ofair -c 10']    # 如果修改了entrypoint
+          resources:       
+            limits:
+              cpu: 6
+              memory: 6Gi
+            requests:
+              cpu: 10m
+              memory: 100Mi
+          env:
+          - name: REDIS_HOST
+            value: "redis-master.infra"
+          - name: REDIS_PORT
+            value: "6379"
+          - name: REDIS_PASSWORD
+            value: "admin"
+          - name: ENVIRONMENT
+            value: "DEV"
+          - name: MYSQL_SERVICE
+            value: "mysql+pymysql://root:admin@mysql-service:3306/myapp?charset=utf8"
+          volumeMounts:
+            - name: myapp-configs
+              mountPath: /home/myapp/myapp/config.py
+              subPath: config.py
+            - name: myapp-configs
+              mountPath: /entrypoint.sh
+              subPath: entrypoint.sh
+            - name: tz-config
+              mountPath: /etc/localtime
+
+
+
+

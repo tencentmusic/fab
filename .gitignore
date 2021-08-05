@@ -1,0 +1,5 @@
+.DS_Store
+.idea
+__pycache__
+install/docker/file
+/myapp/static/assets
