@@ -14,7 +14,7 @@
 
 环境准备：
 
- - 在本地安装docker，docker-compose环境，并可以解析9.149.109.34 csighub.tencentyun.com域名。
+ - 在本地安装docker，docker-compose环境。
  - 你需要有一个mysql数据库，如果没有可以自己部署一个，并创建一个名为myapp的db。
 ```
 linux
@@ -202,7 +202,7 @@ def health():
     return "OK"
 ```
 # 公司组件api
-为了能更方便的与公司内部平台结合，在utils文件夹下添加了较多工具类，可以方便直接访问公司平台，而这些包大部分来自于Pilot项目。https://git.code.oa.com/tme-data-infra/di_api_framework_demo/tree/master/src/utils
+为了能更方便的与公司内部平台结合，在utils文件夹下添加了较多工具类，可以方便直接访问公司平台
 
 # 定时调度能力
 管理控制台难免会有很多的离线定时任务或异步任务。框架集成了celery，可以实现定时任务、异步任务的发起和执行。在config.py配置文件CeleryConfig类中，你可以配置定时框架参数和你要执行的定时任务参数。系统默认配置的是redis作为任务队列和结果存储数据库。
