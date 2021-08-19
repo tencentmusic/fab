@@ -56,29 +56,29 @@ class Model1_ModelView(ModelView):
     add_fieldsets = [
         (
             '属性分组1',
-            {'fields': ['attr1', 'attr2', 'attr3', 'attr4']}
+            {'fields': ['attr1', 'attr2', 'attr4']}
         )
     ]
     # 定义编辑页面要填写的字段
     edit_fieldsets = [
         (
             '属性分组1',
-            {'fields': ['attr1', 'attr2', 'attr3', 'attr4']}
+            {'fields': ['attr1', 'attr2', 'attr4']}
         )
     ]
     # 定义在前端显示时，model的列，显示成一个新别名
-    label_columns = {'attr1': '属性1', 'attr2': "属性2", 'attr3': '属性3'}
+    label_columns = {'attr1': '属性1', 'attr2': "属性2"}
     # 定义前端model list页面显示的列。my_name为自定义样式的一列
-    list_columns = ['attr1', 'attr2', 'attr3']
+    list_columns = ['attr1', 'attr2', 'attr4']
     # 定义单条model记录详情显示的列
     show_fieldsets = [
         (
             '属性分组1',
-            {'fields': ['attr1', 'attr2', 'attr3']}
+            {'fields': ['attr1', 'attr2', 'attr4']}
         ),
         (
             '属性分组2',
-            {'fields': ['attr1', 'attr2', 'attr3'], 'expanded':False}
+            {'fields': ['attr1', 'attr2', 'attr4'], 'expanded':False}
         ),
     ]
     # 定义list页面的默认筛选条件的配置

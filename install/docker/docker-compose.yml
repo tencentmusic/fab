@@ -10,7 +10,7 @@ services:
 
   myapp:
     image: tencentmusic/myapp:2020.10.01
-    restart: unless-stopped
+    restart: on-failure
     command: ['bash','-c','/entrypoint.sh']   # 生产模式
     environment:
       STAGE: 'dev'
@@ -28,7 +28,7 @@ services:
       - ../../myapp/:/home/myapp/myapp/
       - ./entrypoint.sh:/entrypoint.sh
       - ./config.py:/home/myapp/myapp/config.py
-
+#
 #  beat:
 #    image: tencentmusic/myapp:2020.10.01
 #    restart: "no"
@@ -42,11 +42,12 @@ services:
 #    depends_on:
 #      - redis
 #    volumes:
-#      - ./entrypoint.sh:/entrypoint.sh
 #      - ../../myapp/:/home/myapp/myapp/
-
-
-
+#      - ./entrypoint.sh:/entrypoint.sh
+#      - ./config.py:/home/myapp/myapp/config.py
+#
+#
+#
 #  worker:
 #    image: tencentmusic/myapp:2020.10.01
 #    restart: unless-stopped
@@ -59,8 +60,9 @@ services:
 #    depends_on:
 #      - redis
 #    volumes:
-#      - ./entrypoint.sh:/entrypoint.sh
 #      - ../../myapp/:/home/myapp/myapp/
+#      - ./entrypoint.sh:/entrypoint.sh
+#      - ./config.py:/home/myapp/myapp/config.py
 
 
 
