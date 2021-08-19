@@ -150,13 +150,13 @@ appbuilder.add_view(baseview=Model2_ModelView, name="视图2", icon='fa-list',ca
 
 
 # 定义数据表视图
-class Model3_ModelView_Api(MyappModelRestApi):
+class Model2_ModelView_Api(MyappModelRestApi):
     datamodel = SQLAInterface(Model2)
     route_base = '/model2/api'
 
 
 # 添加model的纯后端接口
-appbuilder.add_api(Model3_ModelView_Api)
+appbuilder.add_api(Model2_ModelView_Api)
 
 
 # 在指定菜单栏下面的每个子菜单中间添加一个分割线的显示。
