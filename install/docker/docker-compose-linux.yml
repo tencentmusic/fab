@@ -1,0 +1,72 @@
+version: '3'
+services:
+  redis:
+    image: bitnami/redis:4.0.14
+    restart: unless-stopped
+    network_mode: "host"
+    environment:
+      REDIS_PASSWORD: admin
+    ports:
+      - "6379:6379"
+
+  myapp:
+    network_mode: "host"
+    image: tencentmusic/myapp:2020.10.01
+    restart: on-failure
+    command: ['bash','-c','/entrypoint.sh']   # 生产模式
+    environment:
+      STAGE: 'dev'
+      REDIS_HOST: '127.0.0.1'
+      REDIS_PORT: '6379'
+      REDIS_PASSWORD: admin
+      MYSQL_SERVICE: 'mysql+pymysql://root:admin@127.0.0.1:3306/myapp?charset=utf8'
+      ENVIRONMENT: DEV
+
+    ports:
+      - "80:80"
+    depends_on:
+      - redis
+    volumes:
+      - ../../myapp/:/home/myapp/myapp/
+      - ./entrypoint.sh:/entrypoint.sh
+      - ./config.py:/home/myapp/myapp/config.py
+#
+#  beat:
+#    network_mode: "host"
+#    image: tencentmusic/myapp:2020.10.01
+#    restart: "no"
+#    command: ["bash","-c","celery beat --app=myapp.tasks.celery_app:celery_app --loglevel=info"]
+#    shm_size: '100gb'
+#    environment:
+#      REDIS_HOST: '127.0.0.1'
+#      REDIS_PORT: '6379'
+#      REDIS_PASSWORD: admin
+#      MYSQL_SERVICE: 'mysql+pymysql://root:admin@127.0.0.1:3306/myapp?charset=utf8'
+#    depends_on:
+#      - redis
+#    volumes:
+#      - ../../myapp/:/home/myapp/myapp/
+#      - ./entrypoint.sh:/entrypoint.sh
+#      - ./config.py:/home/myapp/myapp/config.py
+#
+#
+#
+#  worker:
+#    network_mode: "host"
+#    image: tencentmusic/myapp:2020.10.01
+#    restart: unless-stopped
+#    command: ["bash","-c","celery worker --app=myapp.tasks.celery_app:celery_app --loglevel=info --pool=prefork -Ofair -c 4"]
+#    environment:
+#      REDIS_HOST: '127.0.0.1'
+#      REDIS_PORT: '6379'
+#      REDIS_PASSWORD: admin
+#      MYSQL_SERVICE: 'mysql+pymysql://root:admin@127.0.0.1:3306/myapp?charset=utf8'
+#    depends_on:
+#      - redis
+#    volumes:
+#      - ../../myapp/:/home/myapp/myapp/
+#      - ./entrypoint.sh:/entrypoint.sh
+#      - ./config.py:/home/myapp/myapp/config.py
+
+
+

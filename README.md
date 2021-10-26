@@ -47,24 +47,27 @@ docker-compose.yaml文件在install/docker目录下，这里提供了mac和linux
 image：刚才构建的镜像
 MYSQL_SERVICE：mysql的地址
 
+提示：
+ - 1、docker-compose up以后要重启的话，可以先docker-compose down
+ - 2、根据部署机器类型选择使用docker-compose-mac.yml还是docker-compose-linux.yml
 
 1) init
 ```
 cd install/docker
 STAGE: 'init'
-docker-compose -f docker-compose.yml  up
+docker-compose -f docker-compose-mac.yml  up
 ```
 will create table and role/permission
 
 2) debug backend
 ```
 STAGE: 'dev'
-docker-compose -f docker-compose.yml  up
+docker-compose -f docker-compose-mac.yml  up
 ```
 3) Production
 ```
 STAGE: 'prod'
-docker-compose -f docker-compose.yml  up
+docker-compose -f docker-compose-mac.yml  up
 ```
 
 部署以后，登录首页会自动调用认证，会自动创建用户，绑定角色（Gamma和rtx同名角色）。
