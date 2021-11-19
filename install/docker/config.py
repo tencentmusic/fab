@@ -333,7 +333,6 @@ CONFIG_PATH_ENV_VAR = "MYAPP_CONFIG_PATH"
 FLASK_APP_MUTATOR = None
 
 # Set this to false if you don't want users to be able to request/grant
-# datasource access requests from/to other users.
 ENABLE_ACCESS_REQUEST = True
 
 # smtp server configuration
@@ -362,7 +361,6 @@ TROUBLESHOOTING_LINK = ""
 WTF_CSRF_TIME_LIMIT = 60 * 60 * 24 * 7
 
 # This link should lead to a page with instructions on how to gain access to a
-# Datasource. It will be placed at the bottom of permissions errors.
 PERMISSION_INSTRUCTIONS_LINK = ""
 
 # Integrate external Blueprints to the app by passing them to your

@@ -55,7 +55,6 @@ from myapp.utils.dates import datetime_to_epoch, EPOCH
 import re
 import random
 
-
 logging.getLogger("MARKDOWN").setLevel(logging.INFO)
 
 PY3K = sys.version_info >= (3, 0)
@@ -64,26 +63,6 @@ ADHOC_METRIC_EXPRESSION_TYPES = {"SIMPLE": "SIMPLE", "SQL": "SQL"}
 
 JS_MAX_INTEGER = 9007199254740991  # Largest int Java Script can handle 2^53-1
 
-sources = {"chart": 0, "dashboard": 1, "sql_lab": 2}
-
-try:
-    # Having might not have been imported.
-    class DimSelector(Having):
-        def __init__(self, **args):
-            # Just a hack to prevent any exceptions
-            Having.__init__(self, type="equalTo", aggregation=None, value=None)
-
-            self.having = {
-                "having": {
-                    "type": "dimSelector",
-                    "dimension": args["dimension"],
-                    "value": args["value"],
-                }
-            }
-
-
-except NameError:
-    pass
 
 
 def validate_str(obj,key='var'):
@@ -493,12 +472,6 @@ def generic_find_uq_constraint_name(table, columns, insp):
             return uq["name"]
 
 
-def get_datasource_full_name(database_name, datasource_name, schema=None):
-    if not schema:
-        return "[{}].[{}]".format(database_name, datasource_name)
-    return "[{}].[{}].[{}]".format(database_name, schema, datasource_name)
-
-
 def validate_json(obj):
     if obj:
         try:
@@ -506,15 +479,6 @@ def validate_json(obj):
         except Exception:
             raise MyappException("JSON is not valid")
 
-
-def table_has_constraint(table, name, db):
-    """Utility to find a constraint name in alembic migrations"""
-    t = sa.Table(table, db.metadata, autoload=True, autoload_with=db.engine)
-
-    for c in t.constraints:
-        if c.name == name:
-            return True
-    return False
 
 
 class timeout:
@@ -583,35 +547,6 @@ def pessimistic_connection_handling(some_engine):
             connection.should_close_with_result = save_should_close_with_result
 
 
-class QueryStatus:
-    """Enum-type class for query statuses"""
-
-    STOPPED = "stopped"
-    FAILED = "failed"
-    PENDING = "pending"
-    RUNNING = "running"
-    SCHEDULED = "scheduled"
-    SUCCESS = "success"
-    TIMED_OUT = "timed_out"
-
-
-def notify_user_about_perm_udate(granter, user, role, datasource, tpl_name, config):
-    msg = render_template(
-        tpl_name, granter=granter, user=user, role=role, datasource=datasource
-    )
-    logging.info(msg)
-    subject = __(
-        "[Myapp] Access to the datasource %(name)s was granted",
-        name=datasource.full_name,
-    )
-    send_email_smtp(
-        user.email,
-        subject,
-        msg,
-        config,
-        bcc=granter.email,
-        dryrun=not config.get("EMAIL_NOTIFICATIONS"),
-    )
 
 
 def send_email_smtp(
@@ -770,319 +705,6 @@ def get_celery_app(config):
     return _celery_app
 
 
-def to_adhoc(filt, expressionType="SIMPLE", clause="where"):
-    result = {
-        "clause": clause.upper(),
-        "expressionType": expressionType,
-        "filterOptionName": str(uuid.uuid4()),
-    }
-
-    if expressionType == "SIMPLE":
-        result.update(
-            {
-                "comparator": filt.get("val"),
-                "operator": filt.get("op"),
-                "subject": filt.get("col"),
-            }
-        )
-    elif expressionType == "SQL":
-        result.update({"sqlExpression": filt.get(clause)})
-
-    return result
-
-
-def merge_extra_filters(form_data: dict):
-    # extra_filters are temporary/contextual filters (using the legacy constructs)
-    # that are external to the slice definition. We use those for dynamic
-    # interactive filters like the ones emitted by the "Filter Box" visualization.
-    # Note extra_filters only support simple filters.
-    if "extra_filters" in form_data:
-        # __form and __to are special extra_filters that target time
-        # boundaries. The rest of extra_filters are simple
-        # [column_name in list_of_values]. `__` prefix is there to avoid
-        # potential conflicts with column that would be named `from` or `to`
-        if "adhoc_filters" not in form_data or not isinstance(
-            form_data["adhoc_filters"], list
-        ):
-            form_data["adhoc_filters"] = []
-        date_options = {
-            "__time_range": "time_range",
-            "__time_col": "granularity_sqla",
-            "__time_grain": "time_grain_sqla",
-            "__time_origin": "druid_time_origin",
-            "__granularity": "granularity",
-        }
-        # Grab list of existing filters 'keyed' on the column and operator
-
-        def get_filter_key(f):
-            if "expressionType" in f:
-                return "{}__{}".format(f["subject"], f["operator"])
-            else:
-                return "{}__{}".format(f["col"], f["op"])
-
-        existing_filters = {}
-        for existing in form_data["adhoc_filters"]:
-            if (
-                existing["expressionType"] == "SIMPLE"
-                and existing["comparator"] is not None
-                and existing["subject"] is not None
-            ):
-                existing_filters[get_filter_key(existing)] = existing["comparator"]
-
-        for filtr in form_data["extra_filters"]:
-            # Pull out time filters/options and merge into form data
-            if date_options.get(filtr["col"]):
-                if filtr.get("val"):
-                    form_data[date_options[filtr["col"]]] = filtr["val"]
-            elif filtr["val"]:
-                # Merge column filters
-                filter_key = get_filter_key(filtr)
-                if filter_key in existing_filters:
-                    # Check if the filter already exists
-                    if isinstance(filtr["val"], list):
-                        if isinstance(existing_filters[filter_key], list):
-                            # Add filters for unequal lists
-                            # order doesn't matter
-                            if sorted(existing_filters[filter_key]) != sorted(
-                                filtr["val"]
-                            ):
-                                form_data["adhoc_filters"].append(to_adhoc(filtr))
-                        else:
-                            form_data["adhoc_filters"].append(to_adhoc(filtr))
-                    else:
-                        # Do not add filter if same value already exists
-                        if filtr["val"] != existing_filters[filter_key]:
-                            form_data["adhoc_filters"].append(to_adhoc(filtr))
-                else:
-                    # Filter not found, add it
-                    form_data["adhoc_filters"].append(to_adhoc(filtr))
-        # Remove extra filters from the form data since no longer needed
-        del form_data["extra_filters"]
-
-
-def merge_request_params(form_data: dict, params: dict):
-    url_params = {}
-    for key, value in params.items():
-        if key in ("form_data", "r"):
-            continue
-        url_params[key] = value
-    form_data["url_params"] = url_params
-
-
-def user_label(user: User) -> Optional[str]:
-    """Given a user ORM FAB object, returns a label"""
-    return user.username
-
-    # if user:
-    #     if user.first_name and user.last_name:
-    #         return user.first_name + " " + user.last_name
-    #     else:
-    #         return user.username
-    # return None
-
-
-def is_adhoc_metric(metric) -> bool:
-    return (
-        isinstance(metric, dict)
-        and (
-            (
-                metric["expressionType"] == ADHOC_METRIC_EXPRESSION_TYPES["SIMPLE"]
-                and metric["column"]
-                and metric["aggregate"]
-            )
-            or (
-                metric["expressionType"] == ADHOC_METRIC_EXPRESSION_TYPES["SQL"]
-                and metric["sqlExpression"]
-            )
-        )
-        and metric["label"]
-    )
-
-
-
-def ensure_path_exists(path: str):
-    try:
-        os.makedirs(path)
-    except OSError as exc:
-        if not (os.path.isdir(path) and exc.errno == errno.EEXIST):
-            raise
-
-
-def get_since_until(
-    time_range: Optional[str] = None,
-    since: Optional[str] = None,
-    until: Optional[str] = None,
-    time_shift: Optional[str] = None,
-    relative_start: Optional[str] = None,
-    relative_end: Optional[str] = None,
-) -> Tuple[datetime, datetime]:
-    """Return `since` and `until` date time tuple from string representations of
-    time_range, since, until and time_shift.
-
-    This functiom supports both reading the keys separately (from `since` and
-    `until`), as well as the new `time_range` key. Valid formats are:
-
-        - ISO 8601
-        - X days/years/hours/day/year/weeks
-        - X days/years/hours/day/year/weeks ago
-        - X days/years/hours/day/year/weeks from now
-        - freeform
-
-    Additionally, for `time_range` (these specify both `since` and `until`):
-
-        - Last day
-        - Last week
-        - Last month
-        - Last quarter
-        - Last year
-        - No filter
-        - Last X seconds/minutes/hours/days/weeks/months/years
-        - Next X seconds/minutes/hours/days/weeks/months/years
-
-    """
-    separator = " : "
-    relative_start = parse_human_datetime(relative_start if relative_start else "today")
-    relative_end = parse_human_datetime(relative_end if relative_end else "today")
-    common_time_frames = {
-        "Last day": (
-            relative_start - relativedelta(days=1),  # noqa: T400
-            relative_end,
-        ),
-        "Last week": (
-            relative_start - relativedelta(weeks=1),  # noqa: T400
-            relative_end,
-        ),
-        "Last month": (
-            relative_start - relativedelta(months=1),  # noqa: T400
-            relative_end,
-        ),
-        "Last quarter": (
-            relative_start - relativedelta(months=3),  # noqa: T400
-            relative_end,
-        ),
-        "Last year": (
-            relative_start - relativedelta(years=1),  # noqa: T400
-            relative_end,
-        ),
-    }
-
-    if time_range:
-        if separator in time_range:
-            since, until = time_range.split(separator, 1)
-            if since and since not in common_time_frames:
-                since = add_ago_to_since(since)
-            since = parse_human_datetime(since)
-            until = parse_human_datetime(until)
-        elif time_range in common_time_frames:
-            since, until = common_time_frames[time_range]
-        elif time_range == "No filter":
-            since = until = None
-        else:
-            rel, num, grain = time_range.split()
-            if rel == "Last":
-                since = relative_start - relativedelta(  # noqa: T400
-                    **{grain: int(num)}
-                )
-                until = relative_end
-            else:  # rel == 'Next'
-                since = relative_start
-                until = relative_end + relativedelta(**{grain: int(num)})  # noqa: T400
-    else:
-        since = since or ""
-        if since:
-            since = add_ago_to_since(since)
-        since = parse_human_datetime(since)
-        until = parse_human_datetime(until) if until else relative_end
-
-    if time_shift:
-        time_delta = parse_past_timedelta(time_shift)
-        since = since if since is None else (since - time_delta)  # noqa: T400
-        until = until if until is None else (until - time_delta)  # noqa: T400
-
-    if since and until and since > until:
-        raise ValueError(_("From date cannot be larger than to date"))
-
-    return since, until  # noqa: T400
-
-
-def add_ago_to_since(since: str) -> str:
-    """
-    Backwards compatibility hack. Without this slices with since: 7 days will
-    be treated as 7 days in the future.
-
-    :param str since:
-    :returns: Since with ago added if necessary
-    :rtype: str
-    """
-    since_words = since.split(" ")
-    grains = ["days", "years", "hours", "day", "year", "weeks"]
-    if len(since_words) == 2 and since_words[1] in grains:
-        since += " ago"
-    return since
-
-
-def convert_legacy_filters_into_adhoc(fd):
-    mapping = {"having": "having_filters", "where": "filters"}
-
-    if not fd.get("adhoc_filters"):
-        fd["adhoc_filters"] = []
-
-        for clause, filters in mapping.items():
-            if clause in fd and fd[clause] != "":
-                fd["adhoc_filters"].append(to_adhoc(fd, "SQL", clause))
-
-            if filters in fd:
-                for filt in filter(lambda x: x is not None, fd[filters]):
-                    fd["adhoc_filters"].append(to_adhoc(filt, "SIMPLE", clause))
-
-    for key in ("filters", "having", "having_filters", "where"):
-        if key in fd:
-            del fd[key]
-
-
-def split_adhoc_filters_into_base_filters(fd):
-    """
-    Mutates form data to restructure the adhoc filters in the form of the four base
-    filters, `where`, `having`, `filters`, and `having_filters` which represent
-    free form where sql, free form having sql, structured where clauses and structured
-    having clauses.
-    """
-    adhoc_filters = fd.get("adhoc_filters")
-    if isinstance(adhoc_filters, list):
-        simple_where_filters = []
-        simple_having_filters = []
-        sql_where_filters = []
-        sql_having_filters = []
-        for adhoc_filter in adhoc_filters:
-            expression_type = adhoc_filter.get("expressionType")
-            clause = adhoc_filter.get("clause")
-            if expression_type == "SIMPLE":
-                if clause == "WHERE":
-                    simple_where_filters.append(
-                        {
-                            "col": adhoc_filter.get("subject"),
-                            "op": adhoc_filter.get("operator"),
-                            "val": adhoc_filter.get("comparator"),
-                        }
-                    )
-                elif clause == "HAVING":
-                    simple_having_filters.append(
-                        {
-                            "col": adhoc_filter.get("subject"),
-                            "op": adhoc_filter.get("operator"),
-                            "val": adhoc_filter.get("comparator"),
-                        }
-                    )
-            elif expression_type == "SQL":
-                if clause == "WHERE":
-                    sql_where_filters.append(adhoc_filter.get("sqlExpression"))
-                elif clause == "HAVING":
-                    sql_having_filters.append(adhoc_filter.get("sqlExpression"))
-        fd["where"] = " AND ".join(["({})".format(sql) for sql in sql_where_filters])
-        fd["having"] = " AND ".join(["({})".format(sql) for sql in sql_having_filters])
-        fd["having_filters"] = simple_having_filters
-        fd["filters"] = simple_where_filters
-
 
 def get_username() -> Optional[str]:
     """Get username if within the flask context, otherwise return noffin'"""
@@ -1103,4 +725,5 @@ def shortid() -> str:
 def get_stacktrace():
     if current_app.config.get("SHOW_STACKTRACE"):
         return traceback.format_exc()
+
 

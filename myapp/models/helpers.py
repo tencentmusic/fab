@@ -16,8 +16,6 @@ from sqlalchemy.orm.exc import MultipleResultsFound
 import yaml
 import pysnooper
 
-from myapp.utils.core import QueryStatus
-
 
 def json_to_dict(json_str):
     if json_str:
@@ -356,20 +354,6 @@ class AuditMixinNullable(AuditMixin):
     @renders("changed_on")
     def modified(self):
         return Markup(f'<span class="no-wrap">{self.changed_on_humanized}</span>')
-
-
-class QueryResult(object):
-
-    """Object returned by the query interface"""
-
-    def __init__(  # noqa
-        self, df, query, duration, status=QueryStatus.SUCCESS, error_message=None
-    ):
-        self.df = df
-        self.query = query
-        self.duration = duration
-        self.status = status
-        self.error_message = error_message
 
 
 class ExtraJSONMixin:

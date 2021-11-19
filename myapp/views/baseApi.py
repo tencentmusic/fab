@@ -66,20 +66,13 @@ log = logging.getLogger(__name__)
 
 
 def get_error_msg():
-    """
-        (inspired on Superset code)
-    :return: (str)
-    """
     if current_app.config.get("FAB_API_SHOW_STACKTRACE"):
         return traceback.format_exc()
     return "Fatal error"
 
 
 def safe(f):
-    """
-    A decorator that catches uncaught exceptions and
-    return the response in JSON format (inspired on Superset code)
-    """
+
     def wraps(self, *args, **kwargs):
         try:
             return f(self, *args, **kwargs)

@@ -20,7 +20,7 @@ function drawWaterMark({
     font = '40px "-apple-system-font", "Helvetica Neue", "sans-serif"',
     fillStyle = 'rgba(184, 184, 184, 0.4)',
     content = '请勿外传',
-    src='@DI Myapp',
+    src='@FAB Myapp',
     rotate = '30',
     zIndex = 1000
 } = {}) {
@@ -100,7 +100,7 @@ function get_username() {
     if(!id)
         id='';
     content = username;
-    src = id+" @DI Myapp";
+    src = id+" @FAB Myapp";
     $(document).ready(function(){
         drawWaterMark({content:content,src:src});
     });
