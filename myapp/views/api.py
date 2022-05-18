@@ -8,7 +8,7 @@ from flask_appbuilder.security.decorators import protect, permission_name
 from myapp import appbuilder, db,event_logger
 from myapp.utils import core as utils
 from .base import api, BaseMyappView, handle_api_exception
-from myapp.models.model1 import model1_model2,Model2,Model1
+from myapp.models.model1 import Model2,Model1
 
 # BaseApi 类包含了所有的公开方法
 class ExampleApi(BaseApi):

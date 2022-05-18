@@ -5,7 +5,7 @@ from flask_appbuilder import ModelView, AppBuilder, expose, BaseView, has_access
 from flask_babel import gettext as __
 from flask_babel import lazy_gettext as _
 # 将model添加成视图，并控制在前端的显示
-from myapp.models.model1 import model1_model2, Model2, Model1
+from myapp.models.model1 import Model2, Model1
 from flask_appbuilder.actions import action
 from flask_appbuilder.models.sqla.filters import FilterEqualFunction, FilterStartsWith, FilterEqual, FilterNotEqual
 from wtforms.validators import EqualTo, Length
@@ -46,9 +46,31 @@ from .baseApi import (
 import pysnooper
 
 
-# 定义数据库视图
-class Model1_ModelView(ModelView):
+
+# 定义数据表视图
+class Model1_ModelView(MyappModelView):
     datamodel = SQLAInterface(Model1)
+
+
+# 添加model的前后端
+appbuilder.add_view(baseview=Model1_ModelView, name="视图1", icon='fa-list',category='菜单1', category_icon='fa-window-maximize')
+
+
+# 定义数据表视图
+class Model1_ModelView_Api(MyappModelRestApi):
+    datamodel = SQLAInterface(Model1)
+    route_base = '/model2/api'
+
+
+# 添加model的纯后端接口
+appbuilder.add_api(Model1_ModelView_Api)
+
+
+
+
+# 定义数据库视图
+class Model2_ModelView(ModelView):
+    datamodel = SQLAInterface(Model2)
     # model管理的操作类型
     base_permissions = ['can_add', 'can_edit',
                         'can_delete', 'can_list', 'can_show']
@@ -56,29 +78,29 @@ class Model1_ModelView(ModelView):
     add_fieldsets = [
         (
             '属性分组1',
-            {'fields': ['attr1', 'attr2', 'attr4']}
+            {'fields': ['attr1', 'attr2', 'attr3_object']}
         )
     ]
     # 定义编辑页面要填写的字段
     edit_fieldsets = [
         (
             '属性分组1',
-            {'fields': ['attr1', 'attr2', 'attr4']}
+            {'fields': ['attr1', 'attr2', 'attr3_object']}
         )
     ]
     # 定义在前端显示时，model的列，显示成一个新别名
-    label_columns = {'attr1': '属性1', 'attr2': "属性2"}
+    label_columns = {'attr1': '属性1', 'attr2': "属性2",'attr3_object': "属性3"}
     # 定义前端model list页面显示的列。my_name为自定义样式的一列
-    list_columns = ['attr1', 'attr2', 'attr4']
+    list_columns = ['attr1', 'attr2', 'attr3_object']
     # 定义单条model记录详情显示的列
     show_fieldsets = [
         (
             '属性分组1',
-            {'fields': ['attr1', 'attr2', 'attr4']}
+            {'fields': ['attr1', 'attr2', 'attr3_object']}
         ),
         (
             '属性分组2',
-            {'fields': ['attr1', 'attr2', 'attr4'], 'expanded':False}
+            {'fields': ['attr1', 'attr2', 'attr3_object'], 'expanded':False}
         ),
     ]
     # 定义list页面的默认筛选条件的配置
@@ -95,7 +117,7 @@ class Model1_ModelView(ModelView):
         'attr1': [Length(min=1, max=11, message=gettext('fields length mush 11'))]
     }
     # 为关联字段做自定义查询过滤器。add_form_quey_rel_fields、edit_form_query_rel_fields、search_form_query_rel_fields
-    # add_form_query_rel_fields = {'attr3': [['attr1', FilterStartsWith, 'a']]}   # 仅能选择 name字段的值以'家'开头的contact_group。
+    # add_form_query_rel_fields = {'attr3_object': [['attr1', FilterStartsWith, 'a']]}   # 仅能选择 name字段的值以'a'开头的contact_group。
 
     # # 自定义 页面模板
     # show_template = 'appbuilder/general/model/show_cascade.html'
@@ -137,26 +159,8 @@ class Model1_ModelView(ModelView):
 
 
 # 添加视图和菜单
-appbuilder.add_view(Model1_ModelView, "视图1", icon='fa-list',category='菜单1', category_icon='fa-window-maximize')
+appbuilder.add_view(Model2_ModelView, "视图2", icon='fa-list',category='菜单1', category_icon='fa-window-maximize')
 
-
-# 定义数据表视图
-class Model2_ModelView(MyappModelView):
-    datamodel = SQLAInterface(Model2)
-
-
-# 添加model的前后端
-appbuilder.add_view(baseview=Model2_ModelView, name="视图2", icon='fa-list',category='菜单1', category_icon='fa-window-maximize')
-
-
-# 定义数据表视图
-class Model2_ModelView_Api(MyappModelRestApi):
-    datamodel = SQLAInterface(Model2)
-    route_base = '/model2/api'
-
-
-# 添加model的纯后端接口
-appbuilder.add_api(Model2_ModelView_Api)
 
 
 # 在指定菜单栏下面的每个子菜单中间添加一个分割线的显示。

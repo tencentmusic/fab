@@ -6,7 +6,15 @@
   <a href="http://docs.jinkan.org/docs/jinja2/"><img src="https://img.shields.io/badge/Jinja-v2.2.x-green" alt="Jinja"></a>
 </p>
 
+# 主要功能
 
+ - 基础元数据的增删改查搜索排序批操作
+ - 通用pipeline能力
+ - 通用血缘管理的能力
+ - 通用可视化的能力
+ - 通用首页配置
+ 
+ 
 # 本地开发
 
 ## deploy mysql

@@ -66,6 +66,109 @@ FRONTEND_CONF_KEYS = (
 )
 
 
+
+from flask_appbuilder.const import (
+    FLAMSG_ERR_SEC_ACCESS_DENIED,
+    LOGMSG_ERR_SEC_ACCESS_DENIED,
+    PERMISSION_PREFIX
+)
+from flask_appbuilder._compat import as_unicode
+
+log = logging.getLogger(__name__)
+
+def has_access(f):
+    """
+        Use this decorator to enable granular security permissions to your methods.
+        Permissions will be associated to a role, and roles are associated to users.
+
+        By default the permission's name is the methods name.
+    """
+    if hasattr(f, '_permission_name'):
+        permission_str = f._permission_name
+    else:
+        permission_str = f.__name__
+
+    def wraps(self, *args, **kwargs):
+
+        permission_str = "{}{}".format(PERMISSION_PREFIX, f._permission_name)
+        if self.method_permission_name:
+            _permission_name = self.method_permission_name.get(f.__name__)
+            if _permission_name:
+                permission_str = "{}{}".format(PERMISSION_PREFIX, _permission_name)
+        if (permission_str in self.base_permissions and
+                self.appbuilder.sm.has_access(
+                    permission_str,
+                    self.class_permission_name
+                )):
+            return f(self, *args, **kwargs)
+        else:
+            log.warning(
+                LOGMSG_ERR_SEC_ACCESS_DENIED.format(
+                    permission_str,
+                    self.__class__.__name__
+                )
+            )
+            flash(as_unicode(FLAMSG_ERR_SEC_ACCESS_DENIED), "danger")
+        return redirect(
+            url_for(
+                self.appbuilder.sm.auth_view.__class__.__name__ + ".login",
+                next=request.url
+            )
+        )
+
+    f._permission_name = permission_str
+    return functools.update_wrapper(wraps, f)
+
+
+def has_access_api(f):
+    """
+        Use this decorator to enable granular security permissions to your API methods.
+        Permissions will be associated to a role, and roles are associated to users.
+
+        By default the permission's name is the methods name.
+
+        this will return a message and HTTP 401 is case of unauthorized access.
+    """
+    if hasattr(f, '_permission_name'):
+        permission_str = f._permission_name
+    else:
+        permission_str = f.__name__
+
+    def wraps(self, *args, **kwargs):
+        permission_str = "{}{}".format(PERMISSION_PREFIX, f._permission_name)
+        if self.method_permission_name:
+            _permission_name = self.method_permission_name.get(f.__name__)
+            if _permission_name:
+                permission_str = "{}{}".format(PERMISSION_PREFIX, _permission_name)
+        if (permission_str in self.base_permissions and
+                self.appbuilder.sm.has_access(
+                    permission_str,
+                    self.class_permission_name
+                )):
+            return f(self, *args, **kwargs)
+        else:
+            log.warning(
+                LOGMSG_ERR_SEC_ACCESS_DENIED.format(
+                    permission_str,
+                    self.__class__.__name__
+                )
+            )
+            response = make_response(
+                jsonify(
+                    {
+                        'message': str(FLAMSG_ERR_SEC_ACCESS_DENIED),
+                        'severity': 'danger'
+                    }
+                ),
+                401
+            )
+            response.headers['Content-Type'] = "application/json"
+            return response
+
+    f._permission_name = permission_str
+    return functools.update_wrapper(wraps, f)
+
+
 def get_error_msg():
     if conf.get("SHOW_STACKTRACE"):
         error_msg = traceback.format_exc()
@@ -91,6 +194,14 @@ def json_error_response(msg=None, status=500, stacktrace=None, payload=None, lin
         mimetype="application/json",
     )
 
+def json_response(message,status,result):
+    return jsonify(
+        {
+            "message":message,
+            "status":status,
+            "result":result
+        }
+    )
 
 def json_success(json_msg, status=200):
     return Response(json_msg, status=status, mimetype="application/json")
@@ -213,18 +324,26 @@ class MyappModelView(ModelView):
 
     pre_add_get = None
     pre_update_get = None
-    pre_list = None
     post_list = None
     pre_show = None
     post_show = None
-
+    check_edit_permission=None
     label_title = ''
 
-
-
+    conv = GeneralModelConverter(datamodel)
+    pre_list=None
+    user_permissions = {
+        "can_add": True,
+        "can_edit": True,
+        "can_delete": True,
+        "can_show": True
+    }
 
     # 配置增删改查页面标题
     def _init_titles(self):
+
+        self.help_url = conf.get('HELP_URL', {}).get(self.datamodel.obj.__tablename__, '') if self.datamodel else ''
+
         """
             Init Titles if not defined
         """
@@ -251,6 +370,14 @@ class MyappModelView(ModelView):
                 self.show_title = self.label_title+" 详情"
         self.title = self.list_title
 
+    # 每个用户对当前记录的权限，base_permissions 是对所有记录的权限
+    def check_item_permissions(self,item):
+        self.user_permissions = {
+            "add": True,
+            "edit": True,
+            "delete": True,
+            "show": True
+        }
 
     # 配置字段的中文描述
     # @pysnooper.snoop()
@@ -370,11 +497,47 @@ class MyappModelView(ModelView):
             related_views=self._related_views,
         )
 
+
+    # @pysnooper.snoop(watch_explode=('item'))
+    def _add(self):
+        """
+            Add function logic, override to implement different logic
+            returns add widget or None
+        """
+        is_valid_form = True
+        get_filter_args(self._filters)
+        exclude_cols = self._filters.get_relation_cols()
+        form = self.add_form.refresh()
+
+        if request.method == "POST":
+            self._fill_form_exclude_cols(exclude_cols, form)
+            if form.validate():
+                self.process_form(form, True)
+                item = self.datamodel.obj()
+
+                try:
+                    form.populate_obj(item)
+                    self.pre_add(item)
+                except Exception as e:
+                    flash(str(e), "danger")
+                else:
+                    print(item.to_json())
+                    if self.datamodel.add(item):
+                        self.post_add(item)
+                    flash(*self.datamodel.message)
+                finally:
+                    return None
+            else:
+                is_valid_form = False
+        if is_valid_form:
+            self.update_redirect()
+        return self._get_add_widget(form=form, exclude_cols=exclude_cols)
+
+
     @event_logger.log_this
     @expose("/add", methods=["GET", "POST"])
     @has_access
     def add(self):
-
         self.src_item_json = {}
         if request.method=='GET' and self.pre_add_get:
             try:
@@ -394,22 +557,17 @@ class MyappModelView(ModelView):
 
         widget = self._add()
         if not widget:
+            if self.check_redirect_list_url:
+                return redirect(self.check_redirect_list_url)
             return self.post_add_redirect()
         else:
             return self.render_template(
                 self.add_template, title=self.add_title, widgets=widget
             )
 
-    # 检测是否具有编辑权限，只有creator和admin可以编辑
-    def check_edit_permission(self, item):
-        user_roles = [role.name.lower() for role in list(get_user_roles())]
-        if "admin" in user_roles:
-            return
-        if g.user and g.user.username and hasattr(item,'created_by'):
-            if g.user.username!=item.created_by.username:
-              raise MyappException('just creator can edit/delete ')
 
 
+    # @pysnooper.snoop(watch_explode=('item'))
     def _edit(self, pk):
         """
             Edit function logic, override to implement different logic
@@ -421,15 +579,16 @@ class MyappModelView(ModelView):
         orders = get_order_args()
         get_filter_args(self._filters)
         exclude_cols = self._filters.get_relation_cols()
-        # 获取model记录
+
         item = self.datamodel.get(pk, self._base_filters)
         if not item:
             abort(404)
         # convert pk to correct type, if pk is non string type.
         pk = self.datamodel.get_pk_value(item)
-        # post方法修改记录
+
         if request.method == "POST":
             form = self.edit_form.refresh(request.form)
+
             # fill the form with the suppressed cols, generated from exclude_cols
             self._fill_form_exclude_cols(exclude_cols, form)
             # trick to pass unique validation
@@ -450,7 +609,6 @@ class MyappModelView(ModelView):
                     return None
             else:
                 is_valid_form = False
-        # get方法打开
         else:
             # Only force form refresh for select cascade events
             form = self.edit_form.refresh(obj=item)
@@ -477,7 +635,7 @@ class MyappModelView(ModelView):
         pk = self._deserialize_pk_if_composite(pk)
         self.src_item_object = self.datamodel.get(pk, self._base_filters)
 
-        if request.method=='GET' and self.pre_update_get:
+        if request.method=='GET' and self.pre_update_get and self.src_item_object:
             try:
                 self.pre_update_get(self.src_item_object)
                 self.conv = GeneralModelConverter(self.datamodel)
@@ -496,15 +654,24 @@ class MyappModelView(ModelView):
                 return redirect(self.get_redirect())
 
 
+        if self.src_item_object:
+            self.src_item_json = self.src_item_object.to_json()
 
-        self.src_item_json = self.src_item_object.to_json()
-        if self.check_redirect_list_url:
-            try:
-                self.check_edit_permission(self.src_item_object)
-            except Exception as e:
-                print(e)
-                flash(str(e), 'warning')
-                return redirect(self.check_redirect_list_url)
+        # if self.check_redirect_list_url:
+        try:
+            if self.check_edit_permission:
+                has_permission = self.check_edit_permission(self.src_item_object)
+                if not has_permission:
+                    self.update_redirect()
+                    url = self.get_redirect()
+                    return redirect(url)
+
+        except Exception as e:
+            print(e)
+            flash(str(e), 'warning')
+            self.update_redirect()
+            return redirect(self.get_redirect())
+            # return redirect(self.check_redirect_list_url)
 
         widgets = self._edit(pk)
 
@@ -524,11 +691,15 @@ class MyappModelView(ModelView):
     @has_access
     def delete(self, pk):
         pk = self._deserialize_pk_if_composite(pk)
-        src_item_object = self.datamodel.get(pk, self._base_filters)
-        self.src_item_json = src_item_object.to_json()
+        self.src_item_object = self.datamodel.get(pk, self._base_filters)
+        if self.src_item_object:
+            self.src_item_json = self.src_item_object.to_json()
         if self.check_redirect_list_url:
             try:
-                self.check_edit_permission(src_item_object)
+                if self.check_edit_permission:
+                    if not self.check_edit_permission(self.src_item_object):
+                        flash(str('no permission delete'), 'warning')
+                        return redirect(self.check_redirect_list_url)
             except Exception as e:
                 print(e)
                 flash(str(e), 'warning')
@@ -537,6 +708,89 @@ class MyappModelView(ModelView):
         url = url_for(f"{self.endpoint}.list")
         return redirect(url)
         # return self.post_delete_redirect()
+
+from flask_appbuilder.widgets import GroupFormListWidget, ListMasterWidget
+from flask import (
+    abort,
+    flash,
+    jsonify,
+    make_response,
+    redirect,
+    request,
+    send_file,
+    session,
+    url_for,
+)
+
+class CompactCRUDMixin(BaseCRUDView):
+    """
+        Mix with ModelView to implement a list with add and edit on the same page.
+    """
+
+    @classmethod
+    def set_key(cls, k, v):
+        """Allows attaching stateless information to the class using the
+        flask session dict
+        """
+        k = cls.__name__ + "__" + k
+        session[k] = v
+
+    @classmethod
+    def get_key(cls, k, default=None):
+        """Matching get method for ``set_key``
+        """
+        k = cls.__name__ + "__" + k
+        if k in session:
+            return session[k]
+        else:
+            return default
+
+    @classmethod
+    def del_key(cls, k):
+        """Matching get method for ``set_key``
+        """
+        k = cls.__name__ + "__" + k
+        session.pop(k)
+
+    def _get_list_widget(self, **args):
+        """ get joined base filter and current active filter for query """
+        widgets = super(CompactCRUDMixin, self)._get_list_widget(**args)
+        session_form_widget = self.get_key("session_form_widget", None)
+
+        form_widget = None
+        if session_form_widget == "add":
+            form_widget = self._add().get("add")
+        elif session_form_widget == "edit":
+            pk = self.get_key("session_form_edit_pk")
+            if pk and self.datamodel.get(int(pk)):
+                form_widget = self._edit(int(pk)).get("edit")
+        return {
+            "list": GroupFormListWidget(
+                list_widget=widgets.get("list"),
+                form_widget=form_widget,
+                form_action=self.get_key("session_form_action", ""),
+                form_title=self.get_key("session_form_title", ""),
+            )
+        }
+
+    @expose("/list/", methods=["GET", "POST"])
+    @has_access
+    def list(self):
+        list_widgets = self._list()
+        return self.render_template(
+            self.list_template, title=self.list_title, widgets=list_widgets
+        )
+
+    @expose("/delete/<pk>")
+    @has_access
+    def delete(self, pk):
+        pk = self._deserialize_pk_if_composite(pk)
+        self._delete(pk)
+        edit_pk = self.get_key("session_form_edit_pk")
+        if pk == edit_pk:
+            self.del_key("session_form_edit_pk")
+        return redirect(self.get_redirect())
+
 
 # 可以多选的列表页面
 class ListWidgetWithCheckboxes(ListWidget):
@@ -688,8 +942,8 @@ class CsvResponse(Response):
     """
     Override Response to take into account csv encoding from config.py
     """
-
-    charset = conf.get("CSV_EXPORT").get("encoding", "utf-8")
+    if conf and conf.get("CSV_EXPORT"):
+        charset = conf.get("CSV_EXPORT").get("encoding", "utf-8")
 
 # 检查是否有权限
 def check_ownership(obj, raise_if_false=True):

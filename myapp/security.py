@@ -21,6 +21,7 @@ from flask_appbuilder.security.views import (
     RoleListWidget,
     RoleShowWidget,
 )
+from flask_appbuilder.security.views import UserInfoEditView as fab_UserInfoEditView
 from werkzeug.security import check_password_hash
 from flask_appbuilder.security.sqla.models import (
     assoc_permissionview_role,

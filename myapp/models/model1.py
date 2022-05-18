@@ -12,6 +12,7 @@ from sqlalchemy import (
     MetaData,
     String,
     Table,
+    Enum,
     Text,
 )
 
@@ -23,19 +24,10 @@ from flask import Markup
 import datetime
 metadata = Model.metadata
 
-# model关系的表
-model1_model2 = Table(
-    "model1_model2",
-    metadata,
-    Column("id", Integer, primary_key=True),
-    Column("model1_id", Integer, ForeignKey("model1.id")),
-    Column("model2_id", Integer, ForeignKey("model2.id")),
-)
-
 
 # 定义model
-class Model2(Model):
-    __tablename__ = 'model2'
+class Model1(Model):
+    __tablename__ = 'model1'
     id = Column(Integer, primary_key=True)
     attr1 = Column(String(50), unique = True, nullable=False)
 
@@ -44,13 +36,18 @@ class Model2(Model):
 
 
 # 定义model
-class Model1(Model):
-    __tablename__='model1'
+class Model2(Model):
+    __tablename__='model2'
     id = Column(Integer, primary_key=True)
-    attr1 = Column(String(150), unique = True, nullable=False)
-    attr2 = Column(DateTime,default=datetime.datetime.now)   # 定义时间字段，默认值为函数，这样才能在每次写入时都是当时的时间
-    attr3 = Column(Integer, ForeignKey('model2.id'))    # 定义外键
-    attr4 = relationship(Model2,secondary=model1_model2)  # 一对多关系，不存储数据库。第一个参数可以是model或者或者model的名称
+    attr1 = Column(String(150), unique = True, nullable=False)   # 字符串型字段
+    attr2 = Column(Enum('select1','select2'),nullable=False,default='select2')   # 枚举型字段
+
+    attr3_id = Column(Integer, ForeignKey('model1.id'))    # 定义外键id
+    attr3_object = relationship('Model1',foreign_keys=[attr3_id])  # 一对多关系，不存储数据库。第一个参数可以是model或者或者model的名称
+
+    attr4 = Column(Text,default='{}')   # 文本型字段
+    attr5 = Column(Boolean, default=True)  # 布尔型字段
+
 
     def __repr__(self):
         return self.attr1
